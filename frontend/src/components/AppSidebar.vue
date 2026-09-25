@@ -37,12 +37,12 @@ function selectItem(item) {
         <strong>MINEOPS</strong>
         <span>INTELLIGENCE</span>
       </div>
-      <button class="mobile-close" type="button" aria-label="Đóng menu" @click="emit('close-mobile')">
+      <button class="mobile-close" type="button" aria-label="Close menu" @click="emit('close-mobile')">
         <svg viewBox="0 0 20 20" fill="none"><path d="m5 5 10 10M15 5 5 15" /></svg>
       </button>
     </div>
 
-    <nav class="sidebar-navigation" aria-label="Điều hướng chính">
+    <nav class="sidebar-navigation" aria-label="Main navigation">
       <section v-for="group in navigationGroups" :key="group.label" class="nav-group">
         <p class="nav-group-label">{{ group.label }}</p>
 
@@ -87,7 +87,7 @@ function selectItem(item) {
           </span>
 
           <span class="nav-label">{{ item.label }}</span>
-          <span v-if="!item.available" class="coming-soon">Sắp có</span>
+          <span v-if="!item.available" class="coming-soon">Soon</span>
         </button>
       </section>
     </nav>
@@ -96,13 +96,13 @@ function selectItem(item) {
       <div class="site-health">
         <span class="health-icon"><i></i></span>
         <div>
-          <strong>Hệ thống hoạt động</strong>
-          <span>1 module khả dụng</span>
+          <strong>System operational</strong>
+          <span>1 module available</span>
         </div>
       </div>
       <button class="collapse-button" type="button" @click="emit('toggle')">
         <svg viewBox="0 0 20 20" fill="none"><path d="m12 4-6 6 6 6" /></svg>
-        <span>Thu gọn</span>
+        <span>Collapse</span>
       </button>
     </div>
   </aside>

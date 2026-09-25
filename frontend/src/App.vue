@@ -36,7 +36,7 @@ function selectFeature(featureId) {
       v-if="mobileSidebarOpen"
       class="sidebar-backdrop"
       type="button"
-      aria-label="Đóng menu"
+      aria-label="Close menu"
       @click="mobileSidebarOpen = false"
     ></button>
 
@@ -51,7 +51,7 @@ function selectFeature(featureId) {
               <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
                 <path d="m7.5 4.5 5 5-5 5" />
               </svg>
-              <span>An toàn lao động</span>
+              <span>Safety Operations</span>
             </div>
             <h1>{{ currentFeature.label }}</h1>
             <p>{{ currentFeature.description }}</p>
@@ -62,7 +62,7 @@ function selectFeature(featureId) {
               <i></i>
               Site 01 · Sydney
             </span>
-            <span>Cập nhật trực tiếp</span>
+            <span>Live updates</span>
           </div>
         </div>
 

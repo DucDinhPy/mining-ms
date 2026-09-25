@@ -1,10 +1,12 @@
 # PPE Vision Realtime Frontend
 
-Frontend Vue 3 + Vite dùng webcam và WebSocket để phát hiện PPE gần thời gian thực.
+A Vue 3 + Vite administration interface for near real-time PPE detection using a
+browser camera and WebSocket connection.
 
-## Chạy local
+## Run locally
 
-Backend phải lắng nghe WebSocket tại `ws://localhost:8000/api/ws/detect`.
+The backend must expose a WebSocket endpoint at
+`ws://localhost:8000/api/ws/detect`.
 
 ```powershell
 cd "D:\AI project\mining_project\frontend"
@@ -12,15 +14,16 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-Mở `http://localhost:5173`, nhấn **Bật camera** và cho phép trình duyệt truy cập camera.
-Vite sẽ proxy `/api/ws/detect` tới backend port `8000`.
+Open `http://localhost:5173`, select **Start camera**, and grant camera access in
+the browser. Vite proxies `/api/ws/detect` to the backend on port `8000`.
 
 ## WebSocket contract
 
-Frontend gửi từng frame dưới dạng binary JPEG. Frontend chỉ gửi frame kế tiếp sau khi
-đã nhận kết quả frame trước, vì vậy frame cũ không bị xếp hàng khi inference chậm.
+The frontend sends each camera frame as a binary JPEG. It waits for the response
+before sending the next frame, preventing stale frames from building up when
+inference is slower than capture.
 
-Backend cần trả JSON:
+The backend should return:
 
 ```json
 {
@@ -37,33 +40,34 @@ Backend cần trả JSON:
 }
 ```
 
-`inference_ms` là tùy chọn. `bbox` sử dụng định dạng `[x1, y1, x2, y2]` theo kích
-thước frame trong response.
+`inference_ms` is optional. `bbox` uses the `[x1, y1, x2, y2]` format based on
+the frame dimensions returned in the response.
 
-## Cấu hình
+## Configuration
 
-Trong development không cần tạo `.env.local`. Khi frontend không được phục vụ qua
-Vite proxy, tạo `.env.local`:
+No `.env.local` file is required during development. When the frontend is not
+served through the Vite proxy, create `.env.local`:
 
 ```env
 VITE_WS_URL=ws://localhost:8000/api/ws/detect
 ```
 
-Production phải sử dụng HTTPS/WSS để trình duyệt cho phép camera ngoài `localhost`:
+Production deployments must use HTTPS/WSS for browsers to permit camera access
+outside `localhost`:
 
 ```env
 VITE_WS_URL=wss://api.example.com/api/ws/detect
 ```
 
-## Build production
+## Production build
 
 ```powershell
 npm.cmd run build
 ```
 
-Output nằm trong thư mục `dist`.
+The output is written to `dist`.
 
-## Cấu trúc module
+## Module structure
 
 ```text
 src/
@@ -78,11 +82,12 @@ src/
 └── App.vue
 ```
 
-Khi thêm một feature mới:
+To add a feature:
 
-1. Tạo component trong `src/features/<feature-name>/`.
-2. Thêm mục điều hướng vào `src/config/navigation.js` và đặt `available: true`.
-3. Import và render component tương ứng trong `App.vue`.
+1. Create its component under `src/features/<feature-name>/`.
+2. Add a navigation entry in `src/config/navigation.js` and set
+   `available: true`.
+3. Import and render the new component in `App.vue`.
 
-Khi số lượng feature tăng, có thể thay phần render có điều kiện trong `App.vue` bằng
-Vue Router mà không cần thay đổi sidebar hoặc layout quản trị.
+As the feature set grows, the conditional rendering in `App.vue` can be replaced
+with Vue Router without changing the administration shell or sidebar.

@@ -40,14 +40,14 @@ const stageStyle = computed(() => ({
   aspectRatio: `${frameSize.value.width} / ${frameSize.value.height}`,
 }))
 const connectionLabel = computed(() => {
-  if (socketStatus.value === 'online') return 'AI đã kết nối'
-  if (socketStatus.value === 'connecting') return 'Đang kết nối'
-  if (socketStatus.value === 'offline') return 'Mất kết nối'
-  return 'Chưa kết nối'
+  if (socketStatus.value === 'online') return 'AI connected'
+  if (socketStatus.value === 'connecting') return 'Connecting'
+  if (socketStatus.value === 'offline') return 'Connection lost'
+  return 'Not connected'
 })
 const lastUpdatedLabel = computed(() => (
   lastUpdated.value
-    ? lastUpdated.value.toLocaleTimeString('vi-VN', { hour12: false })
+    ? lastUpdated.value.toLocaleTimeString('en-AU', { hour12: false })
     : '—'
 ))
 
@@ -73,7 +73,7 @@ async function startCamera() {
 
   try {
     if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error('Trình duyệt không hỗ trợ truy cập camera.')
+      throw new Error('This browser does not support camera access.')
     }
 
     const videoConstraints = selectedCameraId.value
@@ -117,11 +117,11 @@ async function startCamera() {
 
 function cameraErrorMessage(error) {
   if (error.name === 'NotAllowedError') {
-    return 'Quyền truy cập camera đã bị từ chối. Hãy cho phép camera trong trình duyệt.'
+    return 'Camera access was denied. Allow camera access in your browser settings.'
   }
-  if (error.name === 'NotFoundError') return 'Không tìm thấy camera trên thiết bị.'
-  if (error.name === 'NotReadableError') return 'Camera đang được ứng dụng khác sử dụng.'
-  return error.message || 'Không thể mở camera.'
+  if (error.name === 'NotFoundError') return 'No camera was found on this device.'
+  if (error.name === 'NotReadableError') return 'The camera is currently in use by another application.'
+  return error.message || 'Unable to open the camera.'
 }
 
 async function changeCamera() {
@@ -160,7 +160,7 @@ function connectWebSocket() {
       updateProcessedFps()
       nextTick(drawDetections)
     } catch (error) {
-      errorMessage.value = `Dữ liệu từ AI không hợp lệ: ${error.message}`
+      errorMessage.value = `Invalid AI response: ${error.message}`
     }
   }
 
@@ -340,7 +340,7 @@ onBeforeUnmount(() => stopCamera())
           <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5a10 10 0 0 1 14 0M8 16a6 6 0 0 1 8 0M11 19.5a2 2 0 0 1 2 0" /></svg>
         </div>
         <div>
-          <span>Kết nối AI</span>
+          <span>AI connection</span>
           <strong>{{ connectionLabel }}</strong>
         </div>
         <i class="metric-status-dot" :class="socketStatus"></i>
@@ -351,7 +351,7 @@ onBeforeUnmount(() => stopCamera())
           <svg viewBox="0 0 24 24" fill="none"><path d="M4 14a8 8 0 1 1 16 0M12 14l4-5M6 18h12" /></svg>
         </div>
         <div>
-          <span>Tốc độ xử lý</span>
+          <span>Processing speed</span>
           <strong>{{ processedFps || '—' }} <small>FPS</small></strong>
         </div>
       </article>
@@ -361,7 +361,7 @@ onBeforeUnmount(() => stopCamera())
           <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3" /><path d="M5 21c0-4 3-7 7-7s7 3 7 7" /></svg>
         </div>
         <div>
-          <span>Người trong frame</span>
+          <span>People in frame</span>
           <strong>{{ peopleCount }}</strong>
         </div>
       </article>
@@ -371,7 +371,7 @@ onBeforeUnmount(() => stopCamera())
           <svg viewBox="0 0 24 24" fill="none"><path d="m12 3 10 18H2L12 3Z" /><path d="M12 9v5M12 18h.01" /></svg>
         </div>
         <div>
-          <span>Vi phạm PPE</span>
+          <span>PPE violations</span>
           <strong>{{ violationCount }}</strong>
         </div>
       </article>
@@ -382,7 +382,7 @@ onBeforeUnmount(() => stopCamera())
         <label class="control-field camera-select">
           <span>Camera</span>
           <select v-model="selectedCameraId" :disabled="!cameraDevices.length" @change="changeCamera">
-            <option v-if="!cameraDevices.length" value="">Camera mặc định</option>
+            <option v-if="!cameraDevices.length" value="">Default camera</option>
             <option v-for="(camera, index) in cameraDevices" :key="camera.deviceId" :value="camera.deviceId">
               {{ camera.label || `Camera ${index + 1}` }}
             </option>
@@ -390,7 +390,7 @@ onBeforeUnmount(() => stopCamera())
         </label>
 
         <label class="control-field">
-          <span>Tần suất</span>
+          <span>Frame rate</span>
           <select v-model.number="targetFps" @change="updateCaptureRate">
             <option :value="3">3 FPS</option>
             <option :value="5">5 FPS</option>
@@ -400,14 +400,14 @@ onBeforeUnmount(() => stopCamera())
       </div>
 
       <div class="toolbar-actions">
-        <span v-if="lastUpdated" class="last-update">Cập nhật: {{ lastUpdatedLabel }}</span>
+        <span v-if="lastUpdated" class="last-update">Updated: {{ lastUpdatedLabel }}</span>
         <button v-if="!isCameraActive" class="primary-action" type="button" :disabled="isStarting" @click="startCamera">
           <svg viewBox="0 0 24 24" fill="none"><path d="M3 7h14v12H3zM17 11l4-2v8l-4-2" /></svg>
-          {{ isStarting ? 'Đang mở...' : 'Bật camera' }}
+          {{ isStarting ? 'Starting...' : 'Start camera' }}
         </button>
         <button v-else class="danger-action" type="button" @click="stopCamera()">
           <span></span>
-          Dừng camera
+          Stop camera
         </button>
       </div>
     </section>
@@ -422,7 +422,7 @@ onBeforeUnmount(() => stopCamera())
         <header class="card-header">
           <div>
             <span class="card-kicker">LIVE VIEW</span>
-            <h2>Camera giám sát</h2>
+            <h2>Live camera</h2>
           </div>
           <div class="camera-state" :class="{ live: isCameraActive }">
             <i></i>
@@ -444,8 +444,8 @@ onBeforeUnmount(() => stopCamera())
             <div class="camera-placeholder-icon">
               <svg viewBox="0 0 32 32" fill="none"><rect x="3" y="7" width="20" height="18" rx="3" /><path d="m23 13 6-3v12l-6-3M9 7l2-3h5l2 3" /><circle cx="13" cy="16" r="5" /></svg>
             </div>
-            <strong>Camera chưa hoạt động</strong>
-            <p>Nhấn “Bật camera” để bắt đầu giám sát PPE theo thời gian thực.</p>
+            <strong>Camera is offline</strong>
+            <p>Select “Start camera” to begin real-time PPE monitoring.</p>
           </div>
         </div>
         <canvas ref="captureCanvas" class="hidden-canvas"></canvas>
@@ -455,21 +455,21 @@ onBeforeUnmount(() => stopCamera())
         <header class="card-header detection-header">
           <div>
             <span class="card-kicker">CURRENT FRAME</span>
-            <h2>Phát hiện gần nhất</h2>
+            <h2>Latest detections</h2>
           </div>
           <span class="detection-count">{{ detections.length }}</span>
         </header>
 
         <div class="compliance-summary">
-          <div><i class="safe"></i><span>PPE đạt</span><strong>{{ compliantCount }}</strong></div>
-          <div><i class="violation"></i><span>Vi phạm</span><strong>{{ violationCount }}</strong></div>
+          <div><i class="safe"></i><span>Compliant PPE</span><strong>{{ compliantCount }}</strong></div>
+          <div><i class="violation"></i><span>Violations</span><strong>{{ violationCount }}</strong></div>
         </div>
 
         <div v-if="detections.length" class="detection-table">
           <div class="detection-table-head">
-            <span>Đối tượng</span>
-            <span>Trạng thái</span>
-            <span>Độ tin cậy</span>
+            <span>Object</span>
+            <span>Status</span>
+            <span>Confidence</span>
           </div>
           <div v-for="detection in detections" :key="detection.id" class="detection-row">
             <div class="detection-name">
@@ -477,7 +477,7 @@ onBeforeUnmount(() => stopCamera())
               <strong>{{ detection.label }}</strong>
             </div>
             <span class="status-chip" :class="detection.status">
-              {{ detection.status === 'violation' ? 'Vi phạm' : detection.status === 'safe' ? 'Đạt' : 'Đối tượng' }}
+              {{ detection.status === 'violation' ? 'Violation' : detection.status === 'safe' ? 'Compliant' : 'Object' }}
             </span>
             <strong>{{ Math.round(detection.confidence * 100) }}%</strong>
           </div>
@@ -485,8 +485,8 @@ onBeforeUnmount(() => stopCamera())
 
         <div v-else class="empty-detections">
           <div class="empty-radar"><span></span><i></i></div>
-          <strong>Chưa có dữ liệu phát hiện</strong>
-          <p>Kết quả từ mô hình sẽ được cập nhật tại đây theo từng frame.</p>
+          <strong>No detections yet</strong>
+          <p>Model results will appear here as each frame is processed.</p>
         </div>
       </article>
     </section>
