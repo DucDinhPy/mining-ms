@@ -62,3 +62,27 @@ npm.cmd run build
 ```
 
 Output nằm trong thư mục `dist`.
+
+## Cấu trúc module
+
+```text
+src/
+├── components/
+│   ├── AppSidebar.vue
+│   └── AppTopbar.vue
+├── config/
+│   └── navigation.js
+├── features/
+│   └── ppe/
+│       └── PpeRealtime.vue
+└── App.vue
+```
+
+Khi thêm một feature mới:
+
+1. Tạo component trong `src/features/<feature-name>/`.
+2. Thêm mục điều hướng vào `src/config/navigation.js` và đặt `available: true`.
+3. Import và render component tương ứng trong `App.vue`.
+
+Khi số lượng feature tăng, có thể thay phần render có điều kiện trong `App.vue` bằng
+Vue Router mà không cần thay đổi sidebar hoặc layout quản trị.
