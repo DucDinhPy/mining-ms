@@ -16,6 +16,13 @@ export const navigationGroups = [
         available: true,
         description: 'Monitor personal protective equipment with cameras and real-time AI.',
       },
+      {
+        id: 'cameras',
+        label: 'Cameras',
+        icon: 'camera',
+        available: true,
+        description: 'Register and manage the video sources used by safety and AI modules.',
+      },
     ],
   },
   {

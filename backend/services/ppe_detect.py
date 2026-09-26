@@ -24,8 +24,11 @@ def detect_ppe(image_bytes: bytes, conf: float = 0.4):
     buffer = np.frombuffer(image_bytes, dtype=np.uint8)
     frame = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
 
+    return detect_frame(frame, conf)
+
+def detect_frame(frame: np.ndarray, conf: float = 0.4):
     if frame is None:
-        raise ValueError("Invalid image frame")
+        raise ValueError("Invalid video frame")
 
     height, width = frame.shape[:2]
 
@@ -50,7 +53,10 @@ def detect_ppe(image_bytes: bytes, conf: float = 0.4):
             detections.append({
                 "class_name": model.names[int(class_id)],
                 "confidence": round(float(score), 4),
-                "bbox": [round(float(value), 2) for value in box],
+                "bbox": [
+                    round(float(value), 2)
+                    for value in box
+                ],
             })
 
     return {

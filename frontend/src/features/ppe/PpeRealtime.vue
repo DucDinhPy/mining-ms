@@ -1,32 +1,38 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 
-const videoElement = ref(null)
-const captureCanvas = ref(null)
+import { getCameras } from '../../services/cameraApi'
+
 const overlayCanvas = ref(null)
-const cameraStream = ref(null)
-const cameraDevices = ref([])
+const cameras = ref([])
 const selectedCameraId = ref('')
+const frameUrl = ref('')
 const isCameraActive = ref(false)
 const isStarting = ref(false)
+const isLoadingCameras = ref(false)
 const socketStatus = ref('idle')
+const cameraRuntimeStatus = ref('offline')
 const errorMessage = ref('')
 const detections = ref([])
-const targetFps = ref(5)
 const processedFps = ref(0)
 const frameSize = ref({ width: 640, height: 360 })
 const lastUpdated = ref(null)
 
 let socket = null
-let captureTimer = null
 let reconnectTimer = null
-let awaitingResponse = false
 let shouldReconnect = false
 let processedFrames = []
+let pendingMetadata = null
 
 const violationPattern = /^NO[-_ ]/i
 const compliantPattern = /^(Hardhat|Mask|Safety Vest)$/i
 
+const selectedCamera = computed(
+  () => cameras.value.find((camera) => camera.id === selectedCameraId.value) ?? null,
+)
+const selectedCameraIsOnline = computed(
+  () => String(selectedCamera.value?.status ?? '').toLowerCase() === 'online',
+)
 const peopleCount = computed(
   () => detections.value.filter((item) => /^Person$/i.test(item.label)).length,
 )
@@ -39,10 +45,19 @@ const violationCount = computed(
 const stageStyle = computed(() => ({
   aspectRatio: `${frameSize.value.width} / ${frameSize.value.height}`,
 }))
+const isLive = computed(
+  () => isCameraActive.value && cameraRuntimeStatus.value === 'online' && Boolean(frameUrl.value),
+)
 const connectionLabel = computed(() => {
-  if (socketStatus.value === 'online') return 'AI connected'
   if (socketStatus.value === 'connecting') return 'Connecting'
   if (socketStatus.value === 'offline') return 'Connection lost'
+  if (socketStatus.value === 'online' && cameraRuntimeStatus.value === 'connecting') {
+    return 'Camera connecting'
+  }
+  if (socketStatus.value === 'online' && cameraRuntimeStatus.value === 'offline') {
+    return 'Camera offline'
+  }
+  if (socketStatus.value === 'online') return 'AI connected'
   return 'Not connected'
 })
 const lastUpdatedLabel = computed(() => (
@@ -51,116 +66,98 @@ const lastUpdatedLabel = computed(() => (
     : '—'
 ))
 
-function getWebSocketUrl() {
-  const configuredUrl = import.meta.env.VITE_WS_URL?.trim()
-  if (configuredUrl) return configuredUrl
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${protocol}//${window.location.host}/api/ws/detect`
-}
-
-async function listCameras() {
-  const devices = await navigator.mediaDevices.enumerateDevices()
-  cameraDevices.value = devices.filter((device) => device.kind === 'videoinput')
-  if (!selectedCameraId.value && cameraDevices.value.length) {
-    selectedCameraId.value = cameraDevices.value[0].deviceId
+function getWebSocketUrl(cameraId) {
+  const configuredBaseUrl = import.meta.env.VITE_PPE_WS_BASE_URL?.trim().replace(/\/$/, '')
+  if (configuredBaseUrl) {
+    return `${configuredBaseUrl}/api/ws/cameras/${encodeURIComponent(cameraId)}`
   }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${window.location.host}/api/ws/cameras/${encodeURIComponent(cameraId)}`
 }
 
-async function startCamera() {
-  if (isStarting.value || isCameraActive.value) return
-  isStarting.value = true
+async function loadCameras() {
+  isLoadingCameras.value = true
   errorMessage.value = ''
 
   try {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error('This browser does not support camera access.')
+    const response = await getCameras({ page: 1, pageSize: 100 })
+    cameras.value = response?.items ?? []
+
+    const selectionStillExists = cameras.value.some(
+      (camera) => camera.id === selectedCameraId.value,
+    )
+
+    if (!selectionStillExists) {
+      const onlineCamera = cameras.value.find(
+        (camera) => String(camera.status).toLowerCase() === 'online',
+      )
+      selectedCameraId.value = onlineCamera?.id ?? cameras.value[0]?.id ?? ''
     }
-
-    const videoConstraints = selectedCameraId.value
-      ? {
-          deviceId: { exact: selectedCameraId.value },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        }
-      : {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        }
-
-    cameraStream.value = await navigator.mediaDevices.getUserMedia({
-      video: videoConstraints,
-      audio: false,
-    })
-
-    isCameraActive.value = true
-    shouldReconnect = true
-    await nextTick()
-    videoElement.value.srcObject = cameraStream.value
-    await videoElement.value.play()
-
-    frameSize.value = {
-      width: videoElement.value.videoWidth || 1280,
-      height: videoElement.value.videoHeight || 720,
-    }
-
-    await listCameras()
-    connectWebSocket()
-    startCaptureLoop()
   } catch (error) {
-    stopTracks()
-    errorMessage.value = cameraErrorMessage(error)
+    cameras.value = []
+    selectedCameraId.value = ''
+    errorMessage.value = error.message || 'Unable to load cameras.'
   } finally {
-    isStarting.value = false
+    isLoadingCameras.value = false
   }
 }
 
-function cameraErrorMessage(error) {
-  if (error.name === 'NotAllowedError') {
-    return 'Camera access was denied. Allow camera access in your browser settings.'
+function startCamera() {
+  if (isStarting.value || isCameraActive.value) return
+
+  if (!selectedCamera.value) {
+    errorMessage.value = 'Select a camera before starting monitoring.'
+    return
   }
-  if (error.name === 'NotFoundError') return 'No camera was found on this device.'
-  if (error.name === 'NotReadableError') return 'The camera is currently in use by another application.'
-  return error.message || 'Unable to open the camera.'
+
+  if (!selectedCameraIsOnline.value) {
+    errorMessage.value = 'The selected camera is not marked Online.'
+    return
+  }
+
+  isStarting.value = true
+  errorMessage.value = ''
+  isCameraActive.value = true
+  shouldReconnect = true
+  cameraRuntimeStatus.value = 'connecting'
+  connectWebSocket()
+  isStarting.value = false
 }
 
-async function changeCamera() {
-  if (!isCameraActive.value) return
-  stopCamera(false)
-  await startCamera()
+function changeCamera() {
+  if (!isCameraActive.value) {
+    errorMessage.value = ''
+    return
+  }
+
+  stopCamera()
+  startCamera()
 }
 
 function connectWebSocket() {
   clearTimeout(reconnectTimer)
-  if (!isCameraActive.value || !shouldReconnect) return
+
+  if (!isCameraActive.value || !shouldReconnect || !selectedCameraId.value) return
   if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) return
 
   socketStatus.value = 'connecting'
-  socket = new WebSocket(getWebSocketUrl())
+  socket = new WebSocket(getWebSocketUrl(selectedCameraId.value))
+  socket.binaryType = 'blob'
 
   socket.onopen = () => {
     socketStatus.value = 'online'
     errorMessage.value = ''
-    awaitingResponse = false
   }
 
   socket.onmessage = (event) => {
-    awaitingResponse = false
+    if (typeof event.data === 'string') {
+      handleJsonMessage(event.data)
+      return
+    }
 
-    try {
-      const payload = JSON.parse(event.data)
-      if (payload.error) throw new Error(payload.error)
-
-      if (payload.width && payload.height) {
-        frameSize.value = { width: payload.width, height: payload.height }
-      }
-
-      detections.value = (payload.detections ?? []).map(normalizeDetection)
-      lastUpdated.value = new Date()
-      updateProcessedFps()
-      nextTick(drawDetections)
-    } catch (error) {
-      errorMessage.value = `Invalid AI response: ${error.message}`
+    if (event.data instanceof Blob) {
+      handleFrame(event.data)
     }
   }
 
@@ -170,12 +167,63 @@ function connectWebSocket() {
 
   socket.onclose = () => {
     socketStatus.value = isCameraActive.value ? 'offline' : 'idle'
-    awaitingResponse = false
     socket = null
+
     if (shouldReconnect && isCameraActive.value) {
       reconnectTimer = setTimeout(connectWebSocket, 1500)
     }
   }
+}
+
+function handleJsonMessage(message) {
+  try {
+    const payload = JSON.parse(message)
+
+    if (payload.type === 'error') {
+      errorMessage.value = payload.message || 'Camera stream error.'
+      cameraRuntimeStatus.value = 'offline'
+      return
+    }
+
+    if (payload.type === 'camera_status') {
+      cameraRuntimeStatus.value = payload.status || 'offline'
+
+      if (payload.status === 'offline' && payload.last_error) {
+        errorMessage.value = payload.last_error
+      }
+      return
+    }
+
+    if (payload.type !== 'frame_metadata') return
+
+    pendingMetadata = payload
+    cameraRuntimeStatus.value = 'online'
+    errorMessage.value = ''
+
+    if (payload.width && payload.height) {
+      frameSize.value = {
+        width: payload.width,
+        height: payload.height,
+      }
+    }
+
+    detections.value = (payload.detections ?? []).map(normalizeDetection)
+    lastUpdated.value = payload.captured_at
+      ? new Date(payload.captured_at)
+      : new Date()
+  } catch (error) {
+    errorMessage.value = `Invalid AI response: ${error.message}`
+  }
+}
+
+function handleFrame(blob) {
+  if (!pendingMetadata) return
+
+  if (frameUrl.value) URL.revokeObjectURL(frameUrl.value)
+  frameUrl.value = URL.createObjectURL(blob)
+  pendingMetadata = null
+  updateProcessedFps()
+  nextTick(drawDetections)
 }
 
 function normalizeDetection(item, index) {
@@ -194,55 +242,6 @@ function normalizeDetection(item, index) {
     bbox: Array.isArray(bbox) && bbox.length === 4 ? bbox.map(Number) : null,
     status,
   }
-}
-
-function startCaptureLoop() {
-  clearInterval(captureTimer)
-  captureTimer = setInterval(captureAndSend, 1000 / targetFps.value)
-}
-
-function updateCaptureRate() {
-  if (isCameraActive.value) startCaptureLoop()
-}
-
-function captureAndSend() {
-  const video = videoElement.value
-  const canvas = captureCanvas.value
-
-  if (
-    !video
-    || !canvas
-    || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
-    || !socket
-    || socket.readyState !== WebSocket.OPEN
-    || awaitingResponse
-  ) return
-
-  const sourceWidth = video.videoWidth
-  const sourceHeight = video.videoHeight
-  if (!sourceWidth || !sourceHeight) return
-
-  const outputWidth = Math.min(sourceWidth, 640)
-  const outputHeight = Math.round(sourceHeight * (outputWidth / sourceWidth))
-  canvas.width = outputWidth
-  canvas.height = outputHeight
-
-  canvas.getContext('2d', { alpha: false }).drawImage(
-    video,
-    0,
-    0,
-    outputWidth,
-    outputHeight,
-  )
-
-  awaitingResponse = true
-  canvas.toBlob((blob) => {
-    if (!blob || !socket || socket.readyState !== WebSocket.OPEN) {
-      awaitingResponse = false
-      return
-    }
-    socket.send(blob)
-  }, 'image/jpeg', 0.72)
 }
 
 function drawDetections() {
@@ -287,6 +286,7 @@ function updateProcessedFps() {
   const now = performance.now()
   processedFrames.push(now)
   processedFrames = processedFrames.filter((time) => now - time <= 2000)
+
   if (processedFrames.length > 1) {
     const duration = (processedFrames.at(-1) - processedFrames[0]) / 1000
     processedFps.value = duration > 0
@@ -295,18 +295,11 @@ function updateProcessedFps() {
   }
 }
 
-function stopTracks() {
-  cameraStream.value?.getTracks().forEach((track) => track.stop())
-  cameraStream.value = null
-}
-
 function stopCamera(resetResults = true) {
   shouldReconnect = false
-  clearInterval(captureTimer)
   clearTimeout(reconnectTimer)
-  captureTimer = null
   reconnectTimer = null
-  awaitingResponse = false
+  pendingMetadata = null
 
   if (socket) {
     socket.onclose = null
@@ -314,14 +307,15 @@ function stopCamera(resetResults = true) {
     socket = null
   }
 
-  stopTracks()
-  if (videoElement.value) videoElement.value.srcObject = null
   isCameraActive.value = false
   socketStatus.value = 'idle'
+  cameraRuntimeStatus.value = 'offline'
   processedFps.value = 0
   processedFrames = []
 
   if (resetResults) {
+    if (frameUrl.value) URL.revokeObjectURL(frameUrl.value)
+    frameUrl.value = ''
     detections.value = []
     lastUpdated.value = null
     const context = overlayCanvas.value?.getContext('2d')
@@ -329,6 +323,7 @@ function stopCamera(resetResults = true) {
   }
 }
 
+onMounted(loadCameras)
 onBeforeUnmount(() => stopCamera())
 </script>
 
@@ -381,27 +376,28 @@ onBeforeUnmount(() => stopCamera())
       <div class="toolbar-left">
         <label class="control-field camera-select">
           <span>Camera</span>
-          <select v-model="selectedCameraId" :disabled="!cameraDevices.length" @change="changeCamera">
-            <option v-if="!cameraDevices.length" value="">Default camera</option>
-            <option v-for="(camera, index) in cameraDevices" :key="camera.deviceId" :value="camera.deviceId">
-              {{ camera.label || `Camera ${index + 1}` }}
+          <select v-model="selectedCameraId" :disabled="isLoadingCameras || !cameras.length" @change="changeCamera">
+            <option v-if="!cameras.length" value="">No cameras available</option>
+            <option v-for="camera in cameras" :key="camera.id" :value="camera.id">
+              {{ camera.name }} · {{ camera.location || 'No location' }} · {{ camera.status }}
             </option>
           </select>
         </label>
 
-        <label class="control-field">
-          <span>Frame rate</span>
-          <select v-model.number="targetFps" @change="updateCaptureRate">
-            <option :value="3">3 FPS</option>
-            <option :value="5">5 FPS</option>
-            <option :value="8">8 FPS</option>
-          </select>
-        </label>
+        <button class="secondary-action" type="button" :disabled="isLoadingCameras" @click="loadCameras">
+          {{ isLoadingCameras ? 'Refreshing...' : 'Refresh cameras' }}
+        </button>
       </div>
 
       <div class="toolbar-actions">
         <span v-if="lastUpdated" class="last-update">Updated: {{ lastUpdatedLabel }}</span>
-        <button v-if="!isCameraActive" class="primary-action" type="button" :disabled="isStarting" @click="startCamera">
+        <button
+          v-if="!isCameraActive"
+          class="primary-action"
+          type="button"
+          :disabled="isStarting || !selectedCameraId || !selectedCameraIsOnline"
+          @click="startCamera"
+        >
           <svg viewBox="0 0 24 24" fill="none"><path d="M3 7h14v12H3zM17 11l4-2v8l-4-2" /></svg>
           {{ isStarting ? 'Starting...' : 'Start camera' }}
         </button>
@@ -424,17 +420,24 @@ onBeforeUnmount(() => stopCamera())
             <span class="card-kicker">LIVE VIEW</span>
             <h2>Live camera</h2>
           </div>
-          <div class="camera-state" :class="{ live: isCameraActive }">
+          <div class="camera-state" :class="{ live: isLive }">
             <i></i>
-            {{ isCameraActive ? 'LIVE' : 'OFFLINE' }}
+            {{ isLive ? 'LIVE' : cameraRuntimeStatus.toUpperCase() }}
           </div>
         </header>
 
         <div class="camera-stage" :style="stageStyle">
           <template v-if="isCameraActive">
-            <video ref="videoElement" autoplay muted playsinline></video>
+            <img v-if="frameUrl" class="camera-frame" :src="frameUrl" alt="Live camera stream" />
+            <div v-else class="stream-waiting">
+              <span></span>
+              <strong>{{ connectionLabel }}</strong>
+              <p>Waiting for the Python worker to publish a frame.</p>
+            </div>
             <canvas ref="overlayCanvas" class="overlay-canvas"></canvas>
-            <div class="camera-hud hud-left">CAM 01 · {{ frameSize.width }}×{{ frameSize.height }}</div>
+            <div class="camera-hud hud-left">
+              {{ selectedCamera?.name || 'Camera' }} · {{ frameSize.width }}×{{ frameSize.height }}
+            </div>
             <div class="camera-hud hud-right" :class="socketStatus">{{ connectionLabel }}</div>
             <div class="scan-line"></div>
           </template>
@@ -445,10 +448,9 @@ onBeforeUnmount(() => stopCamera())
               <svg viewBox="0 0 32 32" fill="none"><rect x="3" y="7" width="20" height="18" rx="3" /><path d="m23 13 6-3v12l-6-3M9 7l2-3h5l2 3" /><circle cx="13" cy="16" r="5" /></svg>
             </div>
             <strong>Camera is offline</strong>
-            <p>Select “Start camera” to begin real-time PPE monitoring.</p>
+            <p>Select “Start camera” to begin server-side PPE monitoring.</p>
           </div>
         </div>
-        <canvas ref="captureCanvas" class="hidden-canvas"></canvas>
       </article>
 
       <article class="content-card detections-card">

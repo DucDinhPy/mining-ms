@@ -63,6 +63,11 @@ function selectItem(item) {
               <path d="M12 3 5 6v5c0 4.6 2.9 8.4 7 10 4.1-1.6 7-5.4 7-10V6l-7-3Z" />
               <path d="m9 12 2 2 4-5" />
             </svg>
+            <svg v-else-if="item.icon === 'camera'" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="6" width="14" height="12" rx="2" />
+              <path d="m17 10 4-2v8l-4-2M8 6l1.5-2h3L14 6" />
+              <circle cx="10" cy="12" r="3" />
+            </svg>
             <svg v-else-if="item.icon === 'truck'" viewBox="0 0 24 24" fill="none">
               <path d="M3 6h11v11H3zM14 10h4l3 3v4h-7zM7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM18 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
             </svg>
@@ -97,7 +102,7 @@ function selectItem(item) {
         <span class="health-icon"><i></i></span>
         <div>
           <strong>System operational</strong>
-          <span>1 module available</span>
+          <span>2 modules available</span>
         </div>
       </div>
       <button class="collapse-button" type="button" @click="emit('toggle')">

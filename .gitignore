@@ -57,3 +57,11 @@ temp/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+
+# Visual Studio / .NET
+.vs/
+**/bin/
+**/obj/
+*.user
+*.suo

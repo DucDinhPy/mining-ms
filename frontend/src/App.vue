@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 
 import AppSidebar from './components/AppSidebar.vue'
 import AppTopbar from './components/AppTopbar.vue'
+import CameraManagement from './features/cameras/CameraManagement.vue'
 import PpeRealtime from './features/ppe/PpeRealtime.vue'
 import { navigationGroups } from './config/navigation'
 
@@ -13,6 +14,9 @@ const activeFeature = ref('ppe')
 const allNavigationItems = navigationGroups.flatMap((group) => group.items)
 const currentFeature = computed(
   () => allNavigationItems.find((item) => item.id === activeFeature.value) ?? allNavigationItems[0],
+)
+const currentGroup = computed(
+  () => navigationGroups.find((group) => group.items.some((item) => item.id === activeFeature.value)),
 )
 
 function selectFeature(featureId) {
@@ -51,7 +55,7 @@ function selectFeature(featureId) {
               <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
                 <path d="m7.5 4.5 5 5-5 5" />
               </svg>
-              <span>Safety Operations</span>
+              <span>{{ currentGroup?.label ?? 'Workspace' }}</span>
             </div>
             <h1>{{ currentFeature.label }}</h1>
             <p>{{ currentFeature.description }}</p>
@@ -67,6 +71,7 @@ function selectFeature(featureId) {
         </div>
 
         <PpeRealtime v-if="activeFeature === 'ppe'" />
+        <CameraManagement v-else-if="activeFeature === 'cameras'" />
       </main>
     </div>
   </div>
