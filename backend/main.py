@@ -4,8 +4,16 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from backend.routers import ppe
+from backend.routers import assistant, ppe
 from backend.workers.camera_manager import CameraManager
+
+
+from dotenv import load_dotenv
+from pathlib import Path
+
+BACKEND_DIR = Path(__file__).resolve().parent
+
+load_dotenv(BACKEND_DIR / ".env")
 
 
 logger = logging.getLogger(__name__)
@@ -46,3 +54,4 @@ def health_check():
 
 
 app.include_router(ppe.router)
+app.include_router(assistant.router)

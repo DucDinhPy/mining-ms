@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 
 import AppSidebar from './components/AppSidebar.vue'
 import AppTopbar from './components/AppTopbar.vue'
+import AssistantChat from './features/assistant/AssistantChat.vue'
 import CameraManagement from './features/cameras/CameraManagement.vue'
 import PpeRealtime from './features/ppe/PpeRealtime.vue'
 import { navigationGroups } from './config/navigation'
@@ -74,5 +75,7 @@ function selectFeature(featureId) {
         <CameraManagement v-else-if="activeFeature === 'cameras'" />
       </main>
     </div>
+
+    <AssistantChat />
   </div>
 </template>

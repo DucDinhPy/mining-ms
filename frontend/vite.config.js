@@ -11,9 +11,13 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/api/ws': {
-        target: 'http://127.0.0.1:8002',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         ws: true,
+      },
+      '/api/assistant': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
       },
     },
   },

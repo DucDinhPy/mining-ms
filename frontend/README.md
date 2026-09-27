@@ -1,7 +1,7 @@
 # MineOps Frontend
 
-A Vue 3 + Vite administration interface for camera management and server-side
-PPE detection.
+A Vue 3 + Vite administration interface for camera management, server-side
+PPE detection, and the MineOps AI Assistant.
 
 ## Run locally
 
@@ -10,6 +10,7 @@ Start MediaMTX, the .NET API, and the Python API before the frontend:
 - .NET Camera API: `http://localhost:5057`
 - Python PPE API: `http://127.0.0.1:8002`
 - Camera WebSocket: `ws://127.0.0.1:8002/api/ws/cameras/{camera_id}`
+- Assistant API: `http://127.0.0.1:8002/api/assistant/messages`
 
 ```powershell
 cd "D:\AI project\mining_project\frontend"
@@ -18,7 +19,18 @@ npm.cmd run dev
 ```
 
 Open `http://localhost:5173`. Vite proxies `/api/cameras` to the .NET API and
-`/api/ws` to the Python backend.
+both `/api/ws` and `/api/assistant` to the Python backend.
+
+## AI Assistant
+
+The AI Assistant is available as a persistent popup on every MineOps view. It
+sends messages to the Python backend, so the Gemini API key is never stored in
+or exposed to the browser. The current conversation is kept in `sessionStorage`,
+and the backend `interaction_id` is reused for follow-up questions in the same
+browser tab.
+
+The UI currently supports non-streaming responses and shows elapsed wait time
+while Gemini and MineOps tools are working.
 
 ## PPE stream flow
 
@@ -62,6 +74,7 @@ served through the Vite proxy, create `.env.local`:
 ```env
 VITE_PPE_WS_BASE_URL=ws://127.0.0.1:8002
 VITE_CAMERA_API_URL=http://localhost:5057/api/cameras
+VITE_ASSISTANT_API_URL=http://127.0.0.1:8002
 ```
 
 For an HTTPS deployment, use secure API and WebSocket origins:
@@ -69,6 +82,7 @@ For an HTTPS deployment, use secure API and WebSocket origins:
 ```env
 VITE_PPE_WS_BASE_URL=wss://ppe-api.example.com
 VITE_CAMERA_API_URL=https://camera-api.example.com/api/cameras
+VITE_ASSISTANT_API_URL=https://ppe-api.example.com
 ```
 
 ## Production build
@@ -89,11 +103,14 @@ src/
 |-- config/
 |   `-- navigation.js
 |-- features/
+|   |-- assistant/
+|   |   `-- AssistantChat.vue
 |   |-- cameras/
 |   |   `-- CameraManagement.vue
 |   `-- ppe/
 |       `-- PpeRealtime.vue
 |-- services/
+|   |-- assistantApi.js
 |   `-- cameraApi.js
 `-- App.vue
 ```

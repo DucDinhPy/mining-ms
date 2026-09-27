@@ -20,11 +20,6 @@ if not WEIGHT_PATH.is_file():
 model = YOLO(WEIGHT_PATH)
 model_lock = Lock()
 
-def detect_ppe(image_bytes: bytes, conf: float = 0.4):
-    buffer = np.frombuffer(image_bytes, dtype=np.uint8)
-    frame = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
-
-    return detect_frame(frame, conf)
 
 def detect_frame(frame: np.ndarray, conf: float = 0.4):
     if frame is None:
