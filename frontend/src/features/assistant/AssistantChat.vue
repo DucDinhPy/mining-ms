@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import { sendAssistantMessage } from '../../services/assistantApi'
+import { formatAssistantMessage } from '../../utils/formatAssistantMessage'
 
 const STORAGE_KEY = 'mineops-assistant-session'
 const MAX_MESSAGE_LENGTH = 4000
@@ -311,7 +312,10 @@ onBeforeUnmount(() => {
                 <strong>{{ message.role === 'assistant' ? 'MineOps AI' : 'You' }}</strong>
                 <time :datetime="message.createdAt">{{ formatTime(message.createdAt) }}</time>
               </div>
-              <p>{{ message.content }}</p>
+              <div
+                class="message-markdown"
+                v-html="formatAssistantMessage(message.content)"
+              ></div>
             </div>
           </article>
 
